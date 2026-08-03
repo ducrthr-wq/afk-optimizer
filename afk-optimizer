@@ -1,152 +1,253 @@
 -- =============================================================
--- Script Ultra AFK Optimizer (Màn Hình Đen Chuẩn - Giữ UI Game)
+-- GROW A GARDEN 2 - LOW LAG OPTIMIZER
+-- Ưu tiên CPU/GPU thấp, tránh vòng lặp nặng
 -- =============================================================
 
-local Lighting = game:GetService("Lighting")
+local env = getgenv and getgenv() or _G
+
+if env.__GAG2_LOW_LAG_RUNNING then
+    return
+end
+
+env.__GAG2_LOW_LAG_RUNNING = true
+
 local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 
--- 1. Cấu hình giới hạn FPS
-if setfpscap then setfpscap(15) end
-pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+-- =============================================================
+-- CẤU HÌNH
+-- =============================================================
 
--- -------------------------------------------------------------
--- TÍNH NĂNG MÀN HÌNH ĐEN CHUẨN (TẮT RENDERING 3D WORLD, GIỮ UI)
--- -------------------------------------------------------------
-local function enablePureBlackWorld()
-    -- Cách 1: Chỉnh hiệu ứng sương mù màu đen tuyệt đối sát mắt camera
+local FPS_CAP = 6
+
+-- true: giảm GPU mạnh nhất, vẫn thường giữ ScreenGui.
+local DISABLE_3D_RENDERING = true
+
+-- Plot của bạn.
+local MY_PLOT = "Plot5"
+
+-- Xóa vườn người khác khỏi client.
+local DELETE_OTHER_PLOTS = true
+
+-- Xóa Plants của Plot5.
+-- Để false trước vì script farm có thể cần folder Plants.
+local DELETE_MY_PLANTS = false
+
+-- Xóa toàn bộ phần Visual trong Plot5.
+local DELETE_MY_VISUALS = true
+
+-- =============================================================
+-- HÀM AN TOÀN
+-- =============================================================
+
+local function safeDestroy(object)
+    if not object or not object.Parent then
+        return
+    end
+
+    pcall(function()
+        object:Destroy()
+    end)
+end
+
+-- =============================================================
+-- FPS, RENDER, LIGHTING
+-- =============================================================
+
+pcall(function()
+    if setfpscap then
+        setfpscap(FPS_CAP)
+    end
+end)
+
+pcall(function()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
+
+if DISABLE_3D_RENDERING then
+    pcall(function()
+        RunService:Set3dRenderingEnabled(false)
+    end)
+end
+
+pcall(function()
     Lighting.GlobalShadows = false
-    Lighting.FogColor = Color3.fromRGB(0, 0, 0)
+    Lighting.Brightness = 0
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
     Lighting.FogStart = 0
-    Lighting.FogEnd = 0 -- Đưa sương mù đen về khoảng cách 0 để che hết map 3D
-
-    -- Tạo hiệu ứng ColorCorrection tô đen toàn bộ khung cảnh 3D
-    local colorCorrect = Lighting:FindFirstChild("AFK_BlackScreen") or Instance.new("ColorCorrectionEffect")
-    colorCorrect.Name = "AFK_BlackScreen"
-    colorCorrect.Brightness = -1 -- Đẩy độ sáng về âm để tối đen 3D World
-    colorCorrect.Contrast = 0
-    colorCorrect.Parent = Lighting
-end
-
-enablePureBlackWorld()
-
--- -------------------------------------------------------------
--- 1. SMART CACHE CHARACTER
--- -------------------------------------------------------------
-local CharacterCache = {}
-
-local function updateCharacterCache(char)
-    if char then
-        CharacterCache[char] = true
-        char.Destroying:Connect(function()
-            CharacterCache[char] = nil
-        end)
-    end
-end
-
-for _, p in ipairs(Players:GetPlayers()) do
-    if p.Character then updateCharacterCache(p.Character) end
-    p.CharacterAdded:Connect(updateCharacterCache)
-end
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(updateCharacterCache)
+    Lighting.FogEnd = 0
 end)
 
--- -------------------------------------------------------------
--- 2. BỘ LỌC AN TOÀN CHO AUTO FARM
--- -------------------------------------------------------------
-local function isImportant(obj)
-    local model = obj:FindFirstAncestorOfClass("Model")
-    
-    if model and CharacterCache[model] then
-        return true
-    end
+for _, object in ipairs(Lighting:GetChildren()) do
+    if object:IsA("PostEffect")
+        or object:IsA("Atmosphere")
+        or object:IsA("Sky") then
 
-    if model and model:FindFirstChildOfClass("Humanoid") then
-        return true
-    end
-
-    local parent = obj.Parent
-    if parent then
-        local pName = parent.Name
-        if pName == "Enemies" or pName == "NPCs" or pName == "Characters" or pName == "Chest" or pName == "Chests" then
-            return true
-        end
-    end
-
-    return false
-end
-
--- -------------------------------------------------------------
--- 3. HÀM XỬ LÝ VẬT THỂ
--- -------------------------------------------------------------
-local function optimizeObject(obj)
-    if obj:GetAttribute("AFK_Optimized") then return end
-    obj:SetAttribute("AFK_Optimized", true)
-
-    if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") 
-    or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") or obj:IsA("Highlight") then
-        obj.Enabled = false
-        return
-    end
-
-    if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("SurfaceAppearance") then
-        pcall(function() obj.Transparency = 1 end)
-        return
-    end
-
-    if obj:IsA("BasePart") then
-        if not isImportant(obj) then
-            obj.Transparency = 1
-            obj.CastShadow = false
-        else
-            obj.CastShadow = false
-        end
+        safeDestroy(object)
     end
 end
 
--- -------------------------------------------------------------
--- 4. KĨ THUẬT FRAME-BUDGETING (Anti Lag)
--- -------------------------------------------------------------
-local descendants = Workspace:GetDescendants()
+-- =============================================================
+-- TẮT ÂM THANH
+-- =============================================================
 
-task.spawn(function()
-    local startTime = tick()
-    local maxTimePerFrame = 0.008
-    
-    for i = 1, #descendants do
-        optimizeObject(descendants[i])
-        
-        if (tick() - startTime) >= maxTimePerFrame then
-            RunService.Heartbeat:Wait()
-            startTime = tick()
-        end
-    end
+pcall(function()
+    SoundService.Volume = 0
+    SoundService.AmbientReverb = Enum.ReverbType.NoReverb
 end)
 
--- -------------------------------------------------------------
--- 5. HÀNG ĐỢI XỬ LÝ VẬT THỂ MỚI
--- -------------------------------------------------------------
-local ProcessQueue = {}
+-- =============================================================
+-- TERRAIN
+-- =============================================================
 
-Workspace.DescendantAdded:Connect(function(obj)
-    if isImportant(obj) then
-        optimizeObject(obj)
-    else
-        table.insert(ProcessQueue, obj)
-    end
-end)
+local terrain = Workspace:FindFirstChildOfClass("Terrain")
 
-task.spawn(function()
-    while true do
-        task.wait(0.3)
-        local queueSize = #ProcessQueue
-        if queueSize > 0 then
-            for i = 1, queueSize do
-                optimizeObject(ProcessQueue[i])
+if terrain then
+    pcall(function()
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 1
+        terrain.Decoration = false
+    end)
+end
+
+-- =============================================================
+-- DỌN PLOT
+-- =============================================================
+
+local MyPlotDeleteNames = {
+    Visual = true,
+    Visuals = true,
+    Decorations = true,
+    Decoration = true,
+    Cosmetics = true,
+    Cosmetic = true,
+    Signs = true
+}
+
+local function cleanMyPlot(plot)
+    for _, child in ipairs(plot:GetChildren()) do
+        if DELETE_MY_VISUALS and MyPlotDeleteNames[child.Name] then
+            safeDestroy(child)
+
+        elseif DELETE_MY_PLANTS and child.Name == "Plants" then
+            safeDestroy(child)
+
+        elseif child.Name == "Sprinklers" then
+            -- Không xóa Sprinklers để tránh farm lỗi.
+            -- Chỉ tắt hiệu ứng bên trong một lần.
+            for _, effect in ipairs(child:GetDescendants()) do
+                if effect:IsA("ParticleEmitter")
+                    or effect:IsA("Trail")
+                    or effect:IsA("Beam")
+                    or effect:IsA("Smoke")
+                    or effect:IsA("Fire")
+                    or effect:IsA("Sparkles") then
+
+                    pcall(function()
+                        effect.Enabled = false
+                    end)
+
+                elseif effect:IsA("Sound") then
+                    pcall(function()
+                        effect:Stop()
+                        effect.Volume = 0
+                    end)
+                end
             end
-            table.clear(ProcessQueue)
         end
     end
+end
+
+local function cleanPlot(plot)
+    if not plot or not plot.Parent then
+        return
+    end
+
+    if plot.Name == MY_PLOT then
+        cleanMyPlot(plot)
+
+    elseif DELETE_OTHER_PLOTS then
+        safeDestroy(plot)
+    end
+end
+
+local function setupGardens(gardens)
+    -- Xử lý một lần các plot hiện tại.
+    for _, plot in ipairs(gardens:GetChildren()) do
+        cleanPlot(plot)
+    end
+
+    -- Chỉ theo dõi plot cấp đầu, không theo dõi mọi cây.
+    gardens.ChildAdded:Connect(function(plot)
+        task.delay(0.15, function()
+            cleanPlot(plot)
+        end)
+    end)
+end
+
+local gardens = Workspace:FindFirstChild("Gardens")
+
+if gardens then
+    setupGardens(gardens)
+else
+    task.spawn(function()
+        local loadedGardens = Workspace:WaitForChild("Gardens", 30)
+
+        if loadedGardens then
+            setupGardens(loadedGardens)
+        end
+    end)
+end
+
+-- =============================================================
+-- DỌN VISUAL TOÀN CỤC
+-- =============================================================
+
+local GlobalDeleteNames = {
+    BirdVisuals = true,
+    Birds = true,
+
+    RainDrops = true,
+    RainSplashes = true,
+    StormRainDrops = true,
+    StormSplashes = true,
+    LightningEffects = true,
+    BlizzardBeams = true,
+
+    PottedPlantVisuals = true,
+    GnomeVisuals = true,
+    GrapplingHookVisuals = true,
+
+    _PetVisualClient = true,
+    PlayerPetReferences = true
+}
+
+local function cleanWorkspaceChild(child)
+    if GlobalDeleteNames[child.Name] then
+        safeDestroy(child)
+    end
+end
+
+-- Chỉ duyệt cấp đầu Workspace một lần.
+for _, child in ipairs(Workspace:GetChildren()) do
+    cleanWorkspaceChild(child)
+end
+
+-- Không dùng DescendantAdded vì rất nặng.
+Workspace.ChildAdded:Connect(function(child)
+    if GlobalDeleteNames[child.Name] then
+        task.defer(safeDestroy, child)
+    end
 end)
+
+print("====================================")
+print("[GAG2] Low Lag Optimizer đã bật")
+print("FPS:", FPS_CAP)
+print("Tắt render 3D:", DISABLE_3D_RENDERING)
+print("Giữ Plants của Plot5:", not DELETE_MY_PLANTS)
+print("====================================")
