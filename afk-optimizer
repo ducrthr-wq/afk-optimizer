@@ -1,5 +1,5 @@
 -- =============================================================
--- Script Ultra AFK Optimizer (Frame-Budgeting & Anti-Spike Lag)
+-- Script Ultra AFK Optimizer (Màn Hình Đen Chuẩn - Giữ UI Game)
 -- =============================================================
 
 local Lighting = game:GetService("Lighting")
@@ -11,11 +11,28 @@ local RunService = game:GetService("RunService")
 if setfpscap then setfpscap(15) end
 pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
 
-Lighting.GlobalShadows = false
-Lighting.FogEnd = 9e9
+-- -------------------------------------------------------------
+-- TÍNH NĂNG MÀN HÌNH ĐEN CHUẨN (TẮT RENDERING 3D WORLD, GIỮ UI)
+-- -------------------------------------------------------------
+local function enablePureBlackWorld()
+    -- Cách 1: Chỉnh hiệu ứng sương mù màu đen tuyệt đối sát mắt camera
+    Lighting.GlobalShadows = false
+    Lighting.FogColor = Color3.fromRGB(0, 0, 0)
+    Lighting.FogStart = 0
+    Lighting.FogEnd = 0 -- Đưa sương mù đen về khoảng cách 0 để che hết map 3D
+
+    -- Tạo hiệu ứng ColorCorrection tô đen toàn bộ khung cảnh 3D
+    local colorCorrect = Lighting:FindFirstChild("AFK_BlackScreen") or Instance.new("ColorCorrectionEffect")
+    colorCorrect.Name = "AFK_BlackScreen"
+    colorCorrect.Brightness = -1 -- Đẩy độ sáng về âm để tối đen 3D World
+    colorCorrect.Contrast = 0
+    colorCorrect.Parent = Lighting
+end
+
+enablePureBlackWorld()
 
 -- -------------------------------------------------------------
--- 1. SMART CACHE CHARACTER (Không bao giờ giật lag khi kiểm tra Player)
+-- 1. SMART CACHE CHARACTER
 -- -------------------------------------------------------------
 local CharacterCache = {}
 
@@ -42,17 +59,14 @@ end)
 local function isImportant(obj)
     local model = obj:FindFirstAncestorOfClass("Model")
     
-    -- Tra cứu cực nhanh qua Cache
     if model and CharacterCache[model] then
         return true
     end
 
-    -- Giữ lại NPC / Quái có Humanoid
     if model and model:FindFirstChildOfClass("Humanoid") then
         return true
     end
 
-    -- Bắt buộc giữ lại các Folder chứa Quái / Rương để Auto Farm không lỗi
     local parent = obj.Parent
     if parent then
         local pName = parent.Name
@@ -65,7 +79,7 @@ local function isImportant(obj)
 end
 
 -- -------------------------------------------------------------
--- 3. HÀM XỬ LÝ (Đánh dấu trạng thái tránh trùng lặp)
+-- 3. HÀM XỬ LÝ VẬT THỂ
 -- -------------------------------------------------------------
 local function optimizeObject(obj)
     if obj:GetAttribute("AFK_Optimized") then return end
@@ -93,18 +107,17 @@ local function optimizeObject(obj)
 end
 
 -- -------------------------------------------------------------
--- 4. KĨ THUẬT FRAME-BUDGETING (Phân bổ thời gian CPU - Chống Lag Khi Bật)
+-- 4. KĨ THUẬT FRAME-BUDGETING (Anti Lag)
 -- -------------------------------------------------------------
 local descendants = Workspace:GetDescendants()
 
 task.spawn(function()
     local startTime = tick()
-    local maxTimePerFrame = 0.008 -- Cực kỳ nhẹ: Chỉ dành tối đa 8 millisecond mỗi frame để tối ưu
+    local maxTimePerFrame = 0.008
     
     for i = 1, #descendants do
         optimizeObject(descendants[i])
         
-        -- Nếu thời gian xử lý vượt quá 8ms -> Nhường CPU cho Game render rồi tiếp tục
         if (tick() - startTime) >= maxTimePerFrame then
             RunService.Heartbeat:Wait()
             startTime = tick()
@@ -113,21 +126,18 @@ task.spawn(function()
 end)
 
 -- -------------------------------------------------------------
--- 5. HÀNG ĐỢI XỬ LÝ VẬT THỂ MỚI (Micro-Batching Queue)
+-- 5. HÀNG ĐỢI XỬ LÝ VẬT THỂ MỚI
 -- -------------------------------------------------------------
 local ProcessQueue = {}
 
 Workspace.DescendantAdded:Connect(function(obj)
-    -- Nếu là Quái / NPC vừa xuất hiện -> Cho qua xử lý ngay lập tức để Auto Farm không bị trễ
     if isImportant(obj) then
         optimizeObject(obj)
     else
-        -- Vật thể môi trường mới sẽ xếp hàng đợi xử lý đợt
         table.insert(ProcessQueue, obj)
     end
 end)
 
--- Vòng lặp dọn dẹp hàng đợi mỗi 0.3 giây (Giảm thiểu tối đa tần suất chạy Event)
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -140,10 +150,3 @@ task.spawn(function()
         end
     end
 end)
-
-Lighting.ChildAdded:Connect(function(effect)
-    if effect:IsA("PostEffect") or effect:IsA("Atmosphere") then
-        pcall(function() effect.Enabled = false end)
-    end
-end)
-                            
