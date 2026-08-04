@@ -1,6 +1,6 @@
 -- =============================================================
--- Ultra AFK Optimizer - RAM Safe + Total Mute (No Black Screen)
--- Tối ưu RAM/CPU, giữ nguyên ánh sáng/môi trường 3D & Tắt âm thanh
+-- Ultra AFK Optimizer - RAM Safe + Total Mute + Force Bright
+-- Buộc bật sáng màn hình, tối ưu RAM/CPU & Tắt âm thanh
 -- =============================================================
 
 local Lighting = game:GetService("Lighting")
@@ -10,7 +10,6 @@ local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 
 -- true: xóa một số hiệu ứng/texture không quan trọng để giảm Instance.
--- Có thể làm một số game bị lỗi nếu script game cần các đối tượng đó.
 local AGGRESSIVE_FREE = false
 
 local MAX_TIME_PER_FRAME = 0.006
@@ -23,6 +22,24 @@ end
 
 pcall(function()
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
+
+-- =============================================================
+-- XÓA SẠCH MỌI HIỆU ỨNG LÀM ĐEN MÀN HÌNH CŨ (FORCE BRIGHT)
+-- =============================================================
+pcall(function()
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 2 -- Tăng độ sáng mặc định
+    Lighting.FogEnd = 100000 -- Đẩy sương mù ra xa để không che màn hình
+    Lighting.FogStart = 0
+    Lighting.ExposureCompensation = 0
+
+    -- Xóa các hiệu ứng ColorCorrection / Blur / Atmosphere gây tối màn hình
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("ColorCorrectionEffect") or v:IsA("Atmosphere") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
+            v:Destroy()
+        end
+    end
 end)
 
 -- =============================================================
@@ -97,7 +114,6 @@ local function isImportant(object)
         end
     end
 
-    -- Kiểm tra một số cấp cha thay vì chỉ kiểm tra Parent trực tiếp.
     local ancestor = object.Parent
 
     for _ = 1, 5 do
@@ -142,7 +158,6 @@ local function optimizeObject(object)
 
     OptimizedCache[object] = true
 
-    -- Tắt và dừng âm thanh phát ra từ các Part/Model cụ thể
     if object:IsA("Sound") then
         pcall(function()
             object:Stop()
@@ -211,7 +226,7 @@ local function optimizeObject(object)
 end
 
 -- =============================================================
--- XỬ LÝ CÁC INSTANCE ĐANG CÓ
+-- XỬ LÝ CÁC INSTANCE Đang CÓ
 -- =============================================================
 
 task.spawn(function()
@@ -293,3 +308,4 @@ task.spawn(function()
         end
     end
 end)
+
