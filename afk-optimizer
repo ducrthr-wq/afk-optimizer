@@ -1,6 +1,6 @@
 -- =============================================================
--- Ultra AFK Optimizer - RAM Safe + Total Mute
--- Giữ UI game, ẩn thế giới 3D, tối ưu RAM/CPU & Tắt âm thanh
+-- Ultra AFK Optimizer - RAM Safe + Total Mute (No Black Screen)
+-- Tối ưu RAM/CPU, giữ nguyên ánh sáng/môi trường 3D & Tắt âm thanh
 -- =============================================================
 
 local Lighting = game:GetService("Lighting")
@@ -32,31 +32,6 @@ end)
 pcall(function()
     SoundService.Volume = 0
 end)
-
--- =============================================================
--- MÀN HÌNH ĐEN, KHÔNG CHE SCREEN GUI
--- =============================================================
-
-local function enablePureBlackWorld()
-    Lighting.GlobalShadows = false
-    Lighting.FogColor = Color3.new(0, 0, 0)
-    Lighting.FogStart = 0
-    Lighting.FogEnd = 0
-
-    local effect = Lighting:FindFirstChild("AFK_BlackScreen")
-
-    if not effect then
-        effect = Instance.new("ColorCorrectionEffect")
-        effect.Name = "AFK_BlackScreen"
-        effect.Parent = Lighting
-    end
-
-    effect.Brightness = -1
-    effect.Contrast = 0
-    effect.Saturation = -1
-end
-
-enablePureBlackWorld()
 
 -- =============================================================
 -- WEAK TABLE
