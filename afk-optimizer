@@ -1,40 +1,80 @@
--- =============================================================
--- GROW A GARDEN 2 - LOW LAG OPTIMIZER
--- Ưu tiên CPU/GPU thấp, tránh vòng lặp nặng
--- =============================================================
+--========================================================
+-- Grow a Garden 2 - Lite Optimizer
+-- CPU/GPU thấp - Không quét liên tục
+--========================================================
 
-local env = getgenv and getgenv() or _G
-
-if env.__GAG2_LOW_LAG_RUNNING then
+if getgenv().LiteOptimizer then
     return
 end
+getgenv().LiteOptimizer = true
 
-env.__GAG2_LOW_LAG_RUNNING = true
-
-local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 
--- =============================================================
--- CẤU HÌNH
--- =============================================================
+pcall(function()
+    if setfpscap then
+        setfpscap(8)
+    end
+end)
 
-local FPS_CAP = 6
+pcall(function()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
 
--- true: giảm GPU mạnh nhất, vẫn thường giữ ScreenGui.
-local DISABLE_3D_RENDERING = true
+pcall(function()
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 0
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
+end)
 
--- Plot của bạn.
-local MY_PLOT = "Plot5"
+pcall(function()
+    SoundService.Volume = 0
+end)
 
--- Xóa vườn người khác khỏi client.
-local DELETE_OTHER_PLOTS = true
+local disable = {
+    ParticleEmitter=true,
+    Trail=true,
+    Beam=true,
+    Smoke=true,
+    Fire=true,
+    Sparkles=true,
+    Highlight=true
+}
 
--- Xóa Plants của Plot5.
--- Để false trước vì script farm có thể cần folder Plants.
-local DELETE_MY_PLANTS = false
+for _,obj in ipairs(workspace:GetDescendants()) do
 
+    if disable[obj.ClassName] then
+
+        pcall(function()
+            obj.Enabled=false
+        end)
+
+    elseif obj:IsA("BasePart") then
+
+        obj.CastShadow=false
+
+    elseif obj:IsA("Decal")
+        or obj:IsA("Texture") then
+
+        pcall(function()
+            obj.Transparency=1
+        end)
+
+    elseif obj:IsA("Sound") then
+
+        pcall(function()
+            obj:Stop()
+            obj.Volume=0
+        end)
+
+    end
+
+end
+
+collectgarbage("collect")
+
+print("Lite Optimizer Loaded")
 -- Xóa toàn bộ phần Visual trong Plot5.
 local DELETE_MY_VISUALS = true
 
