@@ -1,12 +1,13 @@
 -- =============================================================
--- Ultra AFK Optimizer - RAM Safe
--- Giữ UI game, ẩn thế giới 3D
+-- Ultra AFK Optimizer - RAM Safe + Total Mute
+-- Giữ UI game, ẩn thế giới 3D, tối ưu RAM/CPU & Tắt âm thanh
 -- =============================================================
 
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 
 -- true: xóa một số hiệu ứng/texture không quan trọng để giảm Instance.
 -- Có thể làm một số game bị lỗi nếu script game cần các đối tượng đó.
@@ -22,6 +23,14 @@ end
 
 pcall(function()
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
+
+-- =============================================================
+-- TẮT ÂM THANH TOÀN CỤC (MUTE SOUND)
+-- =============================================================
+
+pcall(function()
+    SoundService.Volume = 0
 end)
 
 -- =============================================================
@@ -132,7 +141,6 @@ local function isImportant(object)
 end
 
 -- Chỉ xử lý loại Instance có thể tối ưu.
--- Folder, Model, ValueBase... không cần đưa vào cache/hàng đợi.
 local function shouldProcess(object)
     return object:IsA("BasePart")
         or object:IsA("ParticleEmitter")
@@ -145,6 +153,7 @@ local function shouldProcess(object)
         or object:IsA("Decal")
         or object:IsA("Texture")
         or object:IsA("SurfaceAppearance")
+        or object:IsA("Sound")
 end
 
 -- =============================================================
@@ -157,6 +166,15 @@ local function optimizeObject(object)
     end
 
     OptimizedCache[object] = true
+
+    -- Tắt và dừng âm thanh phát ra từ các Part/Model cụ thể
+    if object:IsA("Sound") then
+        pcall(function()
+            object:Stop()
+            object.Volume = 0
+        end)
+        return
+    end
 
     local important = isImportant(object)
 
@@ -187,7 +205,6 @@ local function optimizeObject(object)
         return
     end
 
-    -- SurfaceAppearance không có thuộc tính Transparency.
     if object:IsA("SurfaceAppearance") then
         if AGGRESSIVE_FREE and not important then
             object:Destroy()
@@ -200,7 +217,6 @@ local function optimizeObject(object)
         object.CastShadow = false
 
         if not important then
-            -- Chỉ ẩn cục bộ, không sửa Transparency thật của game.
             object.LocalTransparencyModifier = 1
 
             if AGGRESSIVE_FREE then
@@ -221,7 +237,6 @@ end
 
 -- =============================================================
 -- XỬ LÝ CÁC INSTANCE ĐANG CÓ
--- Xóa từng phần tử khỏi danh sách sau khi xử lý để không giữ RAM
 -- =============================================================
 
 task.spawn(function()
@@ -231,7 +246,6 @@ task.spawn(function()
     for index = 1, #objects do
         local object = objects[index]
 
-        -- Xóa tham chiếu ngay sau khi lấy ra.
         objects[index] = nil
 
         if object and object.Parent and shouldProcess(object) then
@@ -244,13 +258,11 @@ task.spawn(function()
         end
     end
 
-    -- Cho phép bảng được garbage collector thu hồi.
     objects = nil
 end)
 
 -- =============================================================
 -- HÀNG ĐỢI CHO INSTANCE MỚI
--- Không dùng table.clear để tránh giữ dung lượng bảng lớn
 -- =============================================================
 
 local ProcessQueue = {}
@@ -299,7 +311,6 @@ task.spawn(function()
             end
         end
 
-        -- Tạo bảng mới để dung lượng bảng cũ có thể được giải phóng.
         if QueueHead > QueueTail then
             ProcessQueue = {}
             QueueHead = 1
