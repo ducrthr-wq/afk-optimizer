@@ -9,6 +9,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 
+local LocalPlayer = Players.LocalPlayer
+
 -- true: xóa một số hiệu ứng/texture không quan trọng để giảm Instance.
 local AGGRESSIVE_FREE = false
 
@@ -27,23 +29,27 @@ end)
 -- =============================================================
 -- XÓA SẠCH MỌI HIỆU ỨNG LÀM ĐEN MÀN HÌNH CŨ (FORCE BRIGHT)
 -- =============================================================
+
 pcall(function()
     Lighting.GlobalShadows = false
-    Lighting.Brightness = 2 -- Tăng độ sáng mặc định
-    Lighting.FogEnd = 100000 -- Đẩy sương mù ra xa để không che màn hình
+    Lighting.Brightness = 2
+    Lighting.FogEnd = 100000
     Lighting.FogStart = 0
     Lighting.ExposureCompensation = 0
 
-    -- Xóa các hiệu ứng ColorCorrection / Blur / Atmosphere gây tối màn hình
     for _, v in ipairs(Lighting:GetChildren()) do
-        if v:IsA("ColorCorrectionEffect") or v:IsA("Atmosphere") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
+        if v:IsA("ColorCorrectionEffect")
+            or v:IsA("Atmosphere")
+            or v:IsA("BlurEffect")
+            or v:IsA("SunRaysEffect") then
+
             v:Destroy()
         end
     end
 end)
 
 -- =============================================================
--- TẮT ÂM THANH TOÀN CỤC (MUTE SOUND)
+-- TẮT ÂM THANH TOÀN CỤC
 -- =============================================================
 
 pcall(function()
@@ -226,7 +232,7 @@ local function optimizeObject(object)
 end
 
 -- =============================================================
--- XỬ LÝ CÁC INSTANCE Đang CÓ
+-- XỬ LÝ CÁC INSTANCE ĐANG CÓ
 -- =============================================================
 
 task.spawn(function()
@@ -309,3 +315,86 @@ task.spawn(function()
     end
 end)
 
+-- =============================================================
+-- XÓA THÔNG BÁO / POPUP
+-- =============================================================
+
+local NotificationKeywords = {
+    "notification",
+    "notifications",
+    "notify",
+    "message",
+    "alert",
+    "toast",
+    "popup",
+    "pop_up",
+    "reward",
+    "warning",
+    "announcement",
+    "banner"
+}
+
+local function isNotificationGui(object)
+    local name = string.lower(object.Name)
+
+    for _, keyword in ipairs(NotificationKeywords) do
+        if string.find(name, keyword, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function removeNotification(object)
+    if not object or not object.Parent then
+        return
+    end
+
+    if not (
+        object:IsA("ScreenGui")
+        or object:IsA("BillboardGui")
+        or object:IsA("Frame")
+        or object:IsA("TextLabel")
+        or object:IsA("ImageLabel")
+    ) then
+        return
+    end
+
+    if not isNotificationGui(object) then
+        return
+    end
+
+    pcall(function()
+        if object:IsA("ScreenGui") or object:IsA("BillboardGui") then
+            object.Enabled = false
+        elseif object:IsA("GuiObject") then
+            object.Visible = false
+        end
+    end)
+
+    pcall(function()
+        object:Destroy()
+    end)
+end
+
+task.spawn(function()
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+    for _, object in ipairs(PlayerGui:GetDescendants()) do
+        removeNotification(object)
+    end
+
+    PlayerGui.DescendantAdded:Connect(function(object)
+        task.defer(removeNotification, object)
+    end)
+end)
+
+-- Xóa thông báo Roblox mặc định nếu executor hỗ trợ.
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "";
+        Text = "";
+        Duration = 0;
+    })
+end)
